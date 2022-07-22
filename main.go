@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -46,6 +45,8 @@ type Links struct {
 	Self  string `json:"self,omitempty"`
 }
 
+const URL = "http://localhost:8080/v1/organisation/accounts/"
+
 //endregion
 
 //region FETCH MODELS
@@ -86,6 +87,15 @@ type CreateAccountBackendRequest struct {
 
 //endregion
 
+//region DELETE MODELS
+
+type DeleteAccountResult struct {
+	Message string `json:"message"`
+	Success bool   `json:"success"`
+}
+
+//endregion
+
 func ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
 	switch r.Method {
@@ -106,9 +116,9 @@ func ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func Fetch(w http.ResponseWriter, r *http.Request) {
 	c := http.Client{Timeout: time.Duration(1) * time.Second}
-	param := r.URL.Query().Get("account_id")
+	accountId := r.URL.Query().Get("account_id")
 
-	url := "http://localhost:8080/v1/organisation/accounts/" + param
+	url := URL + accountId
 	response, err := c.Get(url)
 
 	if err != nil {
@@ -179,7 +189,7 @@ func Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	url := "http://localhost:8080/v1/organisation/accounts"
+	url := URL
 
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(accountJson))
 	if err != nil {
@@ -190,7 +200,7 @@ func Create(w http.ResponseWriter, r *http.Request) {
 	response, err := c.Do(req)
 
 	if err != nil {
-		http.Error(w, err.Error(), req.Response.StatusCode)
+		http.Error(w, err.Error(), response.StatusCode)
 		return
 	}
 
@@ -236,8 +246,54 @@ func Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func Delete(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("Delete")
+	c := http.Client{Timeout: time.Duration(1) * time.Second}
+	accountId := r.URL.Query().Get("account_id")
+	version := r.URL.Query().Get("version")
+
+	if len(version) <= 0 {
+		version = "0"
+	}
+
+	url := URL + accountId + "?version=" + version
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	response, err := c.Do(req)
+
+	if err != nil {
+		http.Error(w, err.Error(), response.StatusCode)
+		return
+	}
+
+	defer response.Body.Close()
+	body, err := ioutil.ReadAll(response.Body)
+
+	statusOK := response.StatusCode >= 200 && response.StatusCode < 300
+	if !statusOK {
+		var out bytes.Buffer
+		json.Indent(&out, body, "", "  ")
+
+		w.WriteHeader(response.StatusCode)
+		w.Write(out.Bytes())
+		return
+	}
+	var result DeleteAccountResult
+	result.Message = "Account ID " + accountId + " removed with success"
+	result.Success = statusOK
+
+	jsonResult, err := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(jsonResult)
 	return
+
 }
 
 func main() {

@@ -17940,7 +17940,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "http://localhost:8081/accounts?account_id=ad27e265-9605-4b4b-a0e5-3003ea9cc4dc",
+							"raw": "http://localhost:8081/accounts?account_id={{account_id}}",
 							"protocol": "http",
 							"host": [
 								"localhost"
@@ -17952,7 +17952,36 @@
 							"query": [
 								{
 									"key": "account_id",
-									"value": "ad27e265-9605-4b4b-a0e5-3003ea9cc4dc"
+									"value": "{{account_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "DeleteAccount",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8081/accounts?account_id={{account_id}}&version=0",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8081",
+							"path": [
+								"accounts"
+							],
+							"query": [
+								{
+									"key": "account_id",
+									"value": "{{account_id}}"
+								},
+								{
+									"key": "version",
+									"value": "0"
 								}
 							]
 						}
@@ -17961,6 +17990,18 @@
 				},
 				{
 					"name": "CreateAccount",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = JSON.parse(responseBody);\r",
+									"pm.collectionVariables.set('account_id', jsonData.account_id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "PUT",
 						"header": [],
@@ -18286,6 +18327,11 @@
 		{
 			"key": "base_url",
 			"value": "https://api.staging-form3.tech/v1"
+		},
+		{
+			"key": "account_id",
+			"value": "",
+			"type": "string"
 		}
 	]
 }
