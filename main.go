@@ -7,18 +7,27 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 //region COMMON MODELS
 
 type Attributes struct {
-	AlternativeNames []string `json:"alternative_names,omitempty"`
+	Country          string   `json:"country,omitempty"`
+	BaseCurrency     string   `json:"base_currency,omitempty"`
 	BankID           string   `json:"bank_id,omitempty"`
 	BankIDCode       string   `json:"bank_id_code,omitempty"`
-	BaseCurrency     string   `json:"base_currency,omitempty"`
 	Bic              string   `json:"bic,omitempty"`
-	Country          string   `json:"country,omitempty"`
 	Name             []string `json:"name,omitempty"`
+	AlternativeNames []string `json:"alternative_names,omitempty"`
+	UserDefinedData  []struct {
+		Key   string `json:"key,omitempty"`
+		Value string `json:"value,omitempty"`
+	} `json:"user_defined_data,omitempty"`
+	ValidationType      string `json:"validation_type,omitempty"`
+	ReferenceMask       string `json:"reference_mask,omitempty"`
+	AcceptanceQualifier string `json:"acceptance_qualifier,omitempty"`
 }
 
 type Data struct {
@@ -53,6 +62,30 @@ type GetAccountByIdResult struct {
 
 //endregion
 
+//region CREATE MODELS
+
+type CreateAccountBackendResult struct {
+	Data  Data `json:"data"`
+	Links `json:"links"`
+}
+
+type CreateAccountResult struct {
+	AccountId  string     `json:"account_id"`
+	CreatedOn  time.Time  `json:"created_on"`
+	Attributes Attributes `json:"attributes"`
+}
+
+type CreateAccountRequest struct {
+	Attributes     Attributes `json:"attributes"`
+	OrganisationID string     `json:"organisation_id"`
+}
+
+type CreateAccountBackendRequest struct {
+	Data Data `json:"data"`
+}
+
+//endregion
+
 func ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
 	switch r.Method {
@@ -76,58 +109,130 @@ func Fetch(w http.ResponseWriter, r *http.Request) {
 	param := r.URL.Query().Get("account_id")
 
 	url := "http://localhost:8080/v1/organisation/accounts/" + param
-	resp, errGet := c.Get(url)
+	response, err := c.Get(url)
 
-	if errGet != nil {
-		fmt.Printf("Error %s", errGet.Error())
+	if err != nil {
+		http.Error(w, err.Error(), response.StatusCode)
 		return
 	}
 
-	defer resp.Body.Close()
-	body, errReadAll := ioutil.ReadAll(resp.Body)
+	defer response.Body.Close()
+	body, err := ioutil.ReadAll(response.Body)
 
-	if errReadAll != nil {
-		fmt.Printf("Error %s", errReadAll.Error())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if resp.StatusCode != 200 {
+	statusOK := response.StatusCode >= 200 && response.StatusCode < 300
+	if !statusOK {
 		var out bytes.Buffer
-
 		json.Indent(&out, body, "", "  ")
 
-		w.WriteHeader(resp.StatusCode)
+		w.WriteHeader(response.StatusCode)
 		w.Write(out.Bytes())
-
 		return
 	}
 
 	var backendResult GetAccountByIdBackendResult
-	errJsonUnmarshal := json.Unmarshal(body, &backendResult)
+	errUnmarshal := json.Unmarshal(body, &backendResult)
+
+	if errUnmarshal != nil {
+		http.Error(w, errUnmarshal.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	//map
 	var result GetAccountByIdResult
 	result.Attributes = backendResult.Data.Attributes
 	result.CreatedOn = backendResult.Data.CreatedOn
 
-	if errJsonUnmarshal != nil {
-		fmt.Println("Failed on retrieve data", errJsonUnmarshal.Error())
+	jsonBytes, err := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	jsonBytes, errJsonMarshal := json.Marshal(result)
-	if errJsonMarshal != nil {
-		http.Error(w, errJsonMarshal.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(response.StatusCode)
 	w.Write(jsonBytes)
 }
 
 func Create(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("Create")
-	return
+	c := http.Client{Timeout: time.Duration(1) * time.Second}
+
+	requestBody := &CreateAccountRequest{}
+	err := json.NewDecoder(r.Body).Decode(requestBody)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	requestBackend := &CreateAccountBackendRequest{}
+	requestBackend.Data.ID = uuid.NewString()
+	requestBackend.Data.Type = "accounts"
+	requestBackend.Data.OrganisationID = requestBody.OrganisationID
+	requestBackend.Data.Attributes = requestBody.Attributes
+
+	accountJson, err := json.Marshal(requestBackend)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	url := "http://localhost:8080/v1/organisation/accounts"
+
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(accountJson))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response, err := c.Do(req)
+
+	if err != nil {
+		http.Error(w, err.Error(), req.Response.StatusCode)
+		return
+	}
+
+	defer response.Body.Close()
+	body, err := ioutil.ReadAll(response.Body)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	statusOK := response.StatusCode >= 200 && response.StatusCode < 300
+	if !statusOK {
+		var out bytes.Buffer
+		json.Indent(&out, body, "", "  ")
+
+		w.WriteHeader(response.StatusCode)
+		w.Write(out.Bytes())
+		return
+	}
+
+	var backendResult CreateAccountBackendResult
+	errUnmarshal := json.Unmarshal(body, &backendResult)
+
+	if errUnmarshal != nil {
+		http.Error(w, errUnmarshal.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var result CreateAccountResult
+	result.AccountId = backendResult.Data.ID
+	result.Attributes = backendResult.Data.Attributes
+	result.CreatedOn = backendResult.Data.CreatedOn
+
+	jsonBytes, err := json.Marshal(result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(response.StatusCode)
+	w.Write(jsonBytes)
 }
 
 func Delete(w http.ResponseWriter, r *http.Request) {

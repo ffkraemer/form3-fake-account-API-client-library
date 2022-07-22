@@ -3,7 +3,8 @@
 		"_postman_id": "a54977d0-d2ba-4c3b-999e-90246c7e312c",
 		"name": "Form3 API - Production",
 		"description": "![banner](https://s3-eu-west-1.amazonaws.com/developer.form3.tech/images/api-banner5.png)\n\nWelcome to the Form3 API Postman collection. \n\nThe API documentation can be found at: http://api-docs.form3.tech/\n\nThe Form3 API lets you send and receive payments through a number of different payment schemes such as Faster Payments, Bacs, SEPA and others.\n\nThe Form3 API is based on the principle of\n[REST](https://en.wikipedia.org/wiki/Representational_state_transfer).\nIt uses conventions that aim to increase productivity and ease of adoption. As such we have chosen to built our API around the\n[json:api](http://jsonapi.org/) specification\n\nFind out more about our solution by visiting our website: [Form3 Financial Cloud](https://form3.tech/)",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "2827679"
 	},
 	"item": [
 		{
@@ -17928,14 +17929,18 @@
 		},
 		{
 			"name": "GoService",
+			"item": []
+		},
+		{
+			"name": "Home Test - Fábio",
 			"item": [
 				{
-					"name": "GetAccount",
+					"name": "GetAccountById",
 					"request": {
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "http://localhost:8081/accounts?account_id",
+							"raw": "http://localhost:8081/accounts?account_id=ad27e265-9605-4b4b-a0e5-3003ea9cc4dc",
 							"protocol": "http",
 							"host": [
 								"localhost"
@@ -17947,8 +17952,36 @@
 							"query": [
 								{
 									"key": "account_id",
-									"value": null
+									"value": "ad27e265-9605-4b4b-a0e5-3003ea9cc4dc"
 								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "CreateAccount",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{    \r\n    \"organisation_id\": \"eb0bd6f5-c3f5-44b2-b677-acd23cdde73c\",\r\n    \"attributes\": {\r\n      \"country\": \"GB\",\r\n      \"base_currency\": \"GBP\",\r\n      \"bank_id\": \"400300\",\r\n      \"bank_id_code\": \"GBDSC\",\r\n      \"bic\": \"NWBKGB22\",\r\n      \"name\": [\r\n        \"Samantha Holder\"\r\n      ],\r\n      \"alternative_names\": [\r\n        \"Sam Holder\"\r\n      ],\r\n      \"user_defined_data\": [\r\n        {\r\n          \"key\": \"Some account related key\",\r\n          \"value\": \"Some account related value\"\r\n        }\r\n      ],\r\n      \"validation_type\": \"card\",\r\n      \"reference_mask\": \"############\",\r\n      \"acceptance_qualifier\": \"same_day\"\r\n    } \r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:8081/accounts",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8081",
+							"path": [
+								"accounts"
 							]
 						}
 					},
