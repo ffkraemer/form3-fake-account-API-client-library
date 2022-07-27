@@ -7,94 +7,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/client-library/domain"
+
 	"github.com/google/uuid"
 )
 
-//region COMMON MODELS
-
-type Attributes struct {
-	Country          string   `json:"country,omitempty"`
-	BaseCurrency     string   `json:"base_currency,omitempty"`
-	BankID           string   `json:"bank_id,omitempty"`
-	BankIDCode       string   `json:"bank_id_code,omitempty"`
-	Bic              string   `json:"bic,omitempty"`
-	Name             []string `json:"name,omitempty"`
-	AlternativeNames []string `json:"alternative_names,omitempty"`
-	UserDefinedData  []struct {
-		Key   string `json:"key,omitempty"`
-		Value string `json:"value,omitempty"`
-	} `json:"user_defined_data,omitempty"`
-	ValidationType      string `json:"validation_type,omitempty"`
-	ReferenceMask       string `json:"reference_mask,omitempty"`
-	AcceptanceQualifier string `json:"acceptance_qualifier,omitempty"`
-}
-
-type Data struct {
-	Attributes     Attributes `json:"attributes,omitempty"`
-	CreatedOn      time.Time  `json:"created_on,omitempty"`
-	ID             string     `json:"id,omitempty"`
-	ModifiedOn     time.Time  `json:"modified_on,omitempty"`
-	OrganisationID string     `json:"organisation_id,omitempty"`
-	Type           string     `json:"type,omitempty"`
-	Version        float64    `json:"version,omitempty"`
-}
-
-type Links struct {
-	First string `json:"first,omitempty"`
-	Last  string `json:"last,omitempty"`
-	Self  string `json:"self,omitempty"`
-}
-
 const URL = "http://localhost:8080/v1/organisation/accounts/"
-
-//endregion
-
-//region FETCH MODELS
-
-type GetAccountByIdBackendResult struct {
-	Data  Data `json:"data"`
-	Links `json:"links"`
-}
-
-type GetAccountByIdResult struct {
-	CreatedOn  time.Time  `json:"created_on"`
-	Attributes Attributes `json:"attributes"`
-}
-
-//endregion
-
-//region CREATE MODELS
-
-type CreateAccountBackendResult struct {
-	Data  Data `json:"data"`
-	Links `json:"links"`
-}
-
-type CreateAccountResult struct {
-	AccountId  string     `json:"account_id"`
-	CreatedOn  time.Time  `json:"created_on"`
-	Attributes Attributes `json:"attributes"`
-}
-
-type CreateAccountRequest struct {
-	Attributes     Attributes `json:"attributes"`
-	OrganisationID string     `json:"organisation_id"`
-}
-
-type CreateAccountBackendRequest struct {
-	Data Data `json:"data"`
-}
-
-//endregion
-
-//region DELETE MODELS
-
-type DeleteAccountResult struct {
-	Message string `json:"message"`
-	Success bool   `json:"success"`
-}
-
-//endregion
 
 func ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
@@ -144,7 +62,7 @@ func Fetch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var backendResult GetAccountByIdBackendResult
+	var backendResult domain.GetAccountByIdBackendResult
 	errUnmarshal := json.Unmarshal(body, &backendResult)
 
 	if errUnmarshal != nil {
@@ -153,7 +71,7 @@ func Fetch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//map
-	var result GetAccountByIdResult
+	var result domain.GetAccountByIdResult
 	result.Attributes = backendResult.Data.Attributes
 	result.CreatedOn = backendResult.Data.CreatedOn
 
@@ -170,14 +88,14 @@ func Fetch(w http.ResponseWriter, r *http.Request) {
 func Create(w http.ResponseWriter, r *http.Request) {
 	c := http.Client{Timeout: time.Duration(1) * time.Second}
 
-	requestBody := &CreateAccountRequest{}
+	requestBody := &domain.CreateAccountRequest{}
 	err := json.NewDecoder(r.Body).Decode(requestBody)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	requestBackend := &CreateAccountBackendRequest{}
+	requestBackend := &domain.CreateAccountBackendRequest{}
 	requestBackend.Data.ID = uuid.NewString()
 	requestBackend.Data.Type = "accounts"
 	requestBackend.Data.OrganisationID = requestBody.OrganisationID
@@ -189,9 +107,7 @@ func Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	url := URL
-
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(accountJson))
+	req, err := http.NewRequest(http.MethodPost, URL, bytes.NewBuffer(accountJson))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -222,7 +138,7 @@ func Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var backendResult CreateAccountBackendResult
+	var backendResult domain.CreateAccountBackendResult
 	errUnmarshal := json.Unmarshal(body, &backendResult)
 
 	if errUnmarshal != nil {
@@ -230,7 +146,7 @@ func Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var result CreateAccountResult
+	var result domain.CreateAccountResult
 	result.AccountId = backendResult.Data.ID
 	result.Attributes = backendResult.Data.Attributes
 	result.CreatedOn = backendResult.Data.CreatedOn
@@ -279,7 +195,7 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 		w.Write(out.Bytes())
 		return
 	}
-	var result DeleteAccountResult
+	var result domain.DeleteAccountResult
 	result.Message = "Account ID " + accountId + " removed with success"
 	result.Success = statusOK
 
