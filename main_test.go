@@ -3,28 +3,27 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/client-library/domain"
 )
 
 //region CreateTestCase
-var organisationIds = []string{
-	"0d077184-ca1b-4583-a416-29c9a51cf6e",
-	"84385b9c-176d-11ed-861d-0242ac120002"}
+var organisationId = "84385b9c-176d-11ed-861d-0242ac120002"
 
 var accountIds = []string{
-	"3a877792-1783-11ed-861d-0242ac12000",
 	"802052e6-182e-11ed-861d-0242ac120002",
 	"cc3a78fe-1785-11ed-861d-0242ac120002"}
 
 var createAccountRequest_Client = domain.CreateAccountRequest{
-	OrganisationID: organisationIds[1],
+	OrganisationID: organisationId,
 	Attributes: domain.Attributes{
 		Country:      "GB",
 		BaseCurrency: "GBP",
@@ -41,7 +40,7 @@ var createAccountRequest_Client = domain.CreateAccountRequest{
 	},
 }
 
-var clientTestCasesCreate = []struct {
+var testCasesCreate_Client = []struct {
 	name                   string
 	request                domain.CreateAccountRequest
 	expected_status_code   int
@@ -49,7 +48,7 @@ var clientTestCasesCreate = []struct {
 	generated_ids          []string
 }{
 	{"ShouldHaveSuccess", createAccountRequest_Client, http.StatusCreated, "", nil},
-	{"InvalidOrganisationID", domain.CreateAccountRequest{OrganisationID: organisationIds[0],
+	{"InvalidOrganisationID", domain.CreateAccountRequest{OrganisationID: "0d077184-ca1b-4583-a416-29c9a51cf6e",
 		Attributes: createAccountRequest_Client.Attributes}, http.StatusBadRequest, "organisation_id in body must be of type uuid: \"0d077184-ca1b-4583-a416-29c9a51cf6e\"", nil},
 	{"CountryIsRequired", domain.CreateAccountRequest{OrganisationID: createAccountRequest_Client.OrganisationID,
 		Attributes: domain.Attributes{
@@ -68,11 +67,11 @@ var clientTestCasesCreate = []struct {
 			Name: []string{MockingMaxLengthString(140)}}},
 		http.StatusBadRequest, "in body should be at most 140 chars long", nil}}
 
-var createAccountRequest = domain.CreateAccountBackendRequest{
+var createAccountRequest_ServiceAPI = domain.CreateAccountBackendRequest{
 	Data: domain.Data{
 		Type:           "accounts",
-		OrganisationID: organisationIds[1],
-		ID:             accountIds[1],
+		OrganisationID: organisationId,
+		ID:             accountIds[0],
 		Attributes: domain.Attributes{
 			Country: "GB",
 			Name: []string{
@@ -80,58 +79,58 @@ var createAccountRequest = domain.CreateAccountBackendRequest{
 			},
 		}}}
 
-var testCasesCreate = []struct {
+var testCasesCreate_ServiceAPI = []struct {
 	name                   string
 	request                domain.CreateAccountBackendRequest
 	expected_status_code   int
 	expected_message_error string
 }{
-	{"ShouldHaveSuccess", createAccountRequest, http.StatusCreated, ""},
-	{"ViolatesDuplicateConstraint", createAccountRequest, http.StatusConflict, "Account cannot be created as it violates a duplicate constraint"},
+	{"ShouldHaveSuccess", createAccountRequest_ServiceAPI, http.StatusCreated, ""},
+	{"ViolatesDuplicateConstraint", createAccountRequest_ServiceAPI, http.StatusConflict, "Account cannot be created as it violates a duplicate constraint"},
 	{"InvalidOrganisationID", domain.CreateAccountBackendRequest{
 		Data: domain.Data{
-			OrganisationID: organisationIds[0],
-			ID:             createAccountRequest.Data.ID,
-			Attributes:     createAccountRequest.Data.Attributes}},
+			OrganisationID: "0d077184-ca1b-4583-a416-29c9a51cf6e",
+			ID:             accountIds[1],
+			Attributes:     createAccountRequest_ServiceAPI.Data.Attributes}},
 		http.StatusBadRequest, "organisation_id in body must be of type uuid: \"0d077184-ca1b-4583-a416-29c9a51cf6e\""},
 	{"InvalidAccountID", domain.CreateAccountBackendRequest{
 		Data: domain.Data{
-			OrganisationID: createAccountRequest.Data.OrganisationID,
-			ID:             accountIds[0],
+			OrganisationID: createAccountRequest_ServiceAPI.Data.OrganisationID,
+			ID:             "3a877792-1783-11ed-861d-0242ac12000",
 			Attributes:     createAccountRequest_Client.Attributes}}, http.StatusBadRequest, "id in body must be of type uuid: \"3a877792-1783-11ed-861d-0242ac12000\""},
 	{"InvalidType", domain.CreateAccountBackendRequest{
 		Data: domain.Data{
-			OrganisationID: createAccountRequest.Data.OrganisationID,
-			ID:             accountIds[2],
+			OrganisationID: createAccountRequest_ServiceAPI.Data.OrganisationID,
+			ID:             accountIds[1],
 			Type:           "acounts",
-			Attributes:     createAccountRequest.Data.Attributes}},
+			Attributes:     createAccountRequest_ServiceAPI.Data.Attributes}},
 		http.StatusBadRequest, "type in body should be one of [accounts]"},
 	{"CountryIsRequired", domain.CreateAccountBackendRequest{
 		Data: domain.Data{
-			OrganisationID: createAccountRequest.Data.OrganisationID,
-			ID:             accountIds[2],
+			OrganisationID: createAccountRequest_ServiceAPI.Data.OrganisationID,
+			ID:             accountIds[1],
 			Attributes: domain.Attributes{
-				Name: createAccountRequest.Data.Attributes.Name}}},
+				Name: createAccountRequest_ServiceAPI.Data.Attributes.Name}}},
 		http.StatusBadRequest, "country in body is required"},
 	{"NameIsRequired", domain.CreateAccountBackendRequest{
 		Data: domain.Data{
-			OrganisationID: createAccountRequest.Data.OrganisationID,
-			ID:             accountIds[2],
+			OrganisationID: createAccountRequest_ServiceAPI.Data.OrganisationID,
+			ID:             accountIds[1],
 			Attributes: domain.Attributes{
-				Country: createAccountRequest.Data.Attributes.Country}}},
+				Country: createAccountRequest_ServiceAPI.Data.Attributes.Country}}},
 		http.StatusBadRequest, "name in body is required"},
 	{"CountryNotMatches", domain.CreateAccountBackendRequest{
 		Data: domain.Data{
-			OrganisationID: createAccountRequest.Data.OrganisationID,
-			ID:             accountIds[2],
+			OrganisationID: createAccountRequest_ServiceAPI.Data.OrganisationID,
+			ID:             accountIds[1],
 			Attributes: domain.Attributes{
-				Name:    createAccountRequest.Data.Attributes.Name,
+				Name:    createAccountRequest_ServiceAPI.Data.Attributes.Name,
 				Country: "B"}}},
 		http.StatusBadRequest, "country in body should match"},
 	{"NameMoreThan140CharsIsInvalid", domain.CreateAccountBackendRequest{
 		Data: domain.Data{
-			OrganisationID: createAccountRequest.Data.OrganisationID,
-			ID:             accountIds[2],
+			OrganisationID: createAccountRequest_ServiceAPI.Data.OrganisationID,
+			ID:             accountIds[1],
 			Attributes: domain.Attributes{
 				Name: []string{MockingMaxLengthString(140)}}}},
 		http.StatusBadRequest, "in body should be at most 140 chars long"}}
@@ -140,7 +139,7 @@ var testCasesCreate = []struct {
 
 func TestCreateAccount_ClientLibrary(t *testing.T) {
 
-	for _, tc := range clientTestCasesCreate {
+	for _, tc := range testCasesCreate_Client {
 		t.Run("Client_"+tc.name, func(t *testing.T) {
 			expected_status_code := tc.expected_status_code
 
@@ -180,8 +179,11 @@ func TestCreateAccount_ClientLibrary(t *testing.T) {
 					t.Errorf("Expected %s, returned %s", tc.expected_message_error, exc.ErrorMessage)
 					return
 				}
+
+				return
 			}
 
+			//IF EXPECTED SUCCESS, INCLUDES GENERATED ACCOUNT_ID TO TEAR DOWN AFTER
 			body, err := ioutil.ReadAll(w.Body)
 			var result domain.CreateAccountResult
 			errUnmarshal := json.Unmarshal(body, &result)
@@ -196,7 +198,7 @@ func TestCreateAccount_ClientLibrary(t *testing.T) {
 
 func TestCreateAccount_ServiceAPI(t *testing.T) {
 
-	for _, tc := range testCasesCreate {
+	for _, tc := range testCasesCreate_ServiceAPI {
 		t.Run("ServiceAPI_"+tc.name, func(t *testing.T) {
 			expected_status_code := tc.expected_status_code
 
@@ -246,15 +248,17 @@ func TestCreateAccount_ServiceAPI(t *testing.T) {
 }
 
 func Test_TearDown(t *testing.T) {
-
+	//CLEANING CREATED ACCOUNTS
 	for _, accountId := range accountIds {
 		url := URL + "/" + accountId + "?version=0"
+		c := http.Client{Timeout: time.Duration(1) * time.Second}
+
 		req, err := http.NewRequest(http.MethodDelete, url, nil)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
 		response, err := c.Do(req)
+		if err != nil || response.StatusCode != http.StatusNoContent {
+			continue
+		}
+		fmt.Printf("Tear Down: accountId %v succesfully removed \n", accountId)
 	}
 }
 

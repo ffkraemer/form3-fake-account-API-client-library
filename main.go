@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const URL = "http://localhost:8080/v1/organisation/accounts/"
+const URL = "http://localhost:8080/v1/organisation/accounts"
 
 func ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
@@ -36,7 +36,7 @@ func Fetch(w http.ResponseWriter, r *http.Request) {
 	c := http.Client{Timeout: time.Duration(1) * time.Second}
 	accountId := r.URL.Query().Get("account_id")
 
-	url := URL + accountId
+	url := URL + "/" + accountId
 	response, err := c.Get(url)
 
 	if err != nil {
@@ -86,7 +86,6 @@ func Fetch(w http.ResponseWriter, r *http.Request) {
 }
 
 func Create(w http.ResponseWriter, r *http.Request) {
-	c := http.Client{Timeout: time.Duration(1) * time.Second}
 
 	requestBody := &domain.CreateAccountRequest{}
 	err := json.NewDecoder(r.Body).Decode(requestBody)
@@ -107,13 +106,11 @@ func Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req, err := http.NewRequest(http.MethodPost, URL, bytes.NewBuffer(accountJson))
+	response, err := http.Post(URL, "application/json", bytes.NewBuffer(accountJson))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	response, err := c.Do(req)
 
 	if err != nil {
 		http.Error(w, err.Error(), response.StatusCode)
@@ -170,7 +167,7 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 		version = "0"
 	}
 
-	url := URL + accountId + "?version=" + version
+	url := URL + "/" + accountId + "?version=" + version
 	req, err := http.NewRequest(http.MethodDelete, url, nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
