@@ -15,7 +15,7 @@ import (
 	"github.com/client-library/domain"
 )
 
-//region CreateTestCase
+//#region CreateTestCase
 var organisationId = "84385b9c-176d-11ed-861d-0242ac120002"
 
 var accountIds = []string{
@@ -135,13 +135,25 @@ var testCasesCreate_ServiceAPI = []struct {
 				Name: []string{MockingMaxLengthString(140)}}}},
 		http.StatusBadRequest, "in body should be at most 140 chars long"}}
 
-//endregion
+//#endregion
+
+//#region FetchTestCase
+
+var testCasesFetch = []struct {
+	name                   string
+	account_id             string
+	expected_status_code   int
+	expected_message_error string
+}{
+	{"ShouldReturnAccountInformation", accountIds[0], http.StatusOK, ""},
+	{"AccountDoesNotExist", "50078af6-1b5e-11ed-861d-0242ac120002", http.StatusNotFound, "record 50078af6-1b5e-11ed-861d-0242ac120002 does not exist"}}
+
+//#endregion
 
 func TestCreateAccount_ClientLibrary(t *testing.T) {
 
 	for _, tc := range testCasesCreate_Client {
 		t.Run("Client_"+tc.name, func(t *testing.T) {
-			expected_status_code := tc.expected_status_code
 
 			var buf bytes.Buffer
 			err := json.NewEncoder(&buf).Encode(tc.request)
@@ -154,8 +166,8 @@ func TestCreateAccount_ClientLibrary(t *testing.T) {
 			w := httptest.NewRecorder()
 			ServeHTTP(w, r)
 
-			if w.Code != expected_status_code {
-				t.Errorf("Expected %d, returned %d", expected_status_code, w.Code)
+			if w.Code != tc.expected_status_code {
+				t.Errorf("Expected %d, returned %d", tc.expected_status_code, w.Code)
 				return
 			}
 
@@ -200,7 +212,6 @@ func TestCreateAccount_ServiceAPI(t *testing.T) {
 
 	for _, tc := range testCasesCreate_ServiceAPI {
 		t.Run("ServiceAPI_"+tc.name, func(t *testing.T) {
-			expected_status_code := tc.expected_status_code
 
 			var buf bytes.Buffer
 			err := json.NewEncoder(&buf).Encode(tc.request)
@@ -216,8 +227,8 @@ func TestCreateAccount_ServiceAPI(t *testing.T) {
 				return
 			}
 
-			if response.StatusCode != expected_status_code {
-				t.Errorf("Expected %d, returned %d", expected_status_code, response.StatusCode)
+			if response.StatusCode != tc.expected_status_code {
+				t.Errorf("Expected %d, returned %d", tc.expected_status_code, response.StatusCode)
 				t.Errorf("Status Decription: %s", response.Status)
 				return
 			}
@@ -242,6 +253,117 @@ func TestCreateAccount_ServiceAPI(t *testing.T) {
 					t.Errorf("Expected %s, returned %s", tc.expected_message_error, exc.ErrorMessage)
 					return
 				}
+			}
+		})
+	}
+}
+
+func TestFetchAccount_ClientLibrary(t *testing.T) {
+
+	for _, tc := range testCasesFetch {
+		t.Run("Client_"+tc.name, func(t *testing.T) {
+
+			r := httptest.NewRequest(http.MethodGet, "/accounts?account_id="+tc.account_id, nil)
+			w := httptest.NewRecorder()
+			ServeHTTP(w, r)
+
+			if w.Code != tc.expected_status_code {
+				t.Errorf("Expected %d, returned %d", tc.expected_status_code, w.Code)
+				return
+			}
+
+			//This test is expecting some error
+			if len(tc.expected_message_error) > 0 {
+
+				body, err := ioutil.ReadAll(w.Body)
+				if err != nil {
+					t.Errorf(err.Error())
+					return
+				}
+
+				var exc domain.CustomException
+				errUnmarshal := json.Unmarshal(body, &exc)
+				if errUnmarshal != nil {
+					t.Errorf(errUnmarshal.Error())
+					return
+				}
+
+				if !strings.Contains(exc.ErrorMessage, tc.expected_message_error) {
+					t.Errorf("Expected %s, returned %s", tc.expected_message_error, exc.ErrorMessage)
+					return
+				}
+
+				return
+			}
+
+			body, err := ioutil.ReadAll(w.Body)
+			if err != nil {
+				t.Errorf(err.Error())
+				return
+			}
+			var result domain.GetAccountByIdResult
+			errUnmarshal := json.Unmarshal(body, &result)
+			if errUnmarshal != nil {
+				t.Errorf(errUnmarshal.Error())
+				return
+			}
+
+		})
+	}
+}
+
+func TestFetchAccount_ServiceAPI(t *testing.T) {
+
+	for _, tc := range testCasesFetch {
+		t.Run("ServiceAPI_"+tc.name, func(t *testing.T) {
+
+			response, err := http.Get(URL + "/" + tc.account_id)
+
+			if err != nil {
+				t.Errorf(err.Error())
+				return
+			}
+
+			if response.StatusCode != tc.expected_status_code {
+				t.Errorf("Expected %d, returned %d", tc.expected_status_code, response.StatusCode)
+				t.Errorf("Status Decription: %s", response.Status)
+				return
+			}
+
+			//This test is expecting some error
+			if len(tc.expected_message_error) > 0 {
+
+				body, err := ioutil.ReadAll(response.Body)
+				if err != nil {
+					t.Errorf(err.Error())
+					return
+				}
+
+				var exc domain.CustomException
+				errUnmarshal := json.Unmarshal(body, &exc)
+				if errUnmarshal != nil {
+					t.Errorf(errUnmarshal.Error())
+					return
+				}
+
+				if !strings.Contains(exc.ErrorMessage, tc.expected_message_error) {
+					t.Errorf("Expected %s, returned %s", tc.expected_message_error, exc.ErrorMessage)
+					return
+				}
+
+				return
+			}
+
+			body, err := ioutil.ReadAll(response.Body)
+			if err != nil {
+				t.Errorf(err.Error())
+				return
+			}
+			var result domain.GetAccountByIdBackendResult
+			errUnmarshal := json.Unmarshal(body, &result)
+			if errUnmarshal != nil {
+				t.Errorf(errUnmarshal.Error())
+				return
 			}
 		})
 	}
