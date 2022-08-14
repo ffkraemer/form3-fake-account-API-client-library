@@ -158,7 +158,7 @@ var testCasesDelete_Client = []struct {
 	expected_status_code   int
 	expected_message_error string
 }{
-	{"ShouldReturnOkOnDeleteSuccessfully", accountIds[0], http.StatusOK, ""},
+	{"ShouldReturnOkOnDeleteSuccessfully", "", http.StatusOK, ""},
 	{"AccountNotFound", "50078af6-1b5e-11ed-861d-0242ac120002", http.StatusNotFound, ""}}
 
 var testCasesDelete_ServiceAPI = []struct {
@@ -167,7 +167,7 @@ var testCasesDelete_ServiceAPI = []struct {
 	expected_status_code   int
 	expected_message_error string
 }{
-	{"ShouldReturnNoContentOnDeleteSuccessfully", "", http.StatusNoContent, ""},
+	{"ShouldReturnNoContentOnDeleteSuccessfully", accountIds[0], http.StatusNoContent, ""},
 	{"AccountNotFound", "50078af6-1b5e-11ed-861d-0242ac120002", http.StatusNotFound, ""}}
 
 //#endregion
@@ -398,7 +398,7 @@ func TestDeleteAccount_ClientLibrary(t *testing.T) {
 	for _, tc := range testCasesDelete_Client {
 		t.Run("Client_"+tc.name, func(t *testing.T) {
 
-			r := httptest.NewRequest(http.MethodDelete, "/accounts?account_id="+tc.account_id, nil)
+			r := httptest.NewRequest(http.MethodDelete, "/accounts?account_id="+accountIds[len(accountIds)-1], nil)
 			w := httptest.NewRecorder()
 			ServeHTTP(w, r)
 
@@ -440,7 +440,7 @@ func TestDeleteAccount_ServiceAPI(t *testing.T) {
 	for _, tc := range testCasesDelete_ServiceAPI {
 		t.Run("ServiceAPI_"+tc.name, func(t *testing.T) {
 
-			url := URL + "/" + accountIds[len(accountIds)-1] + "?version=0"
+			url := URL + "/" + tc.account_id + "?version=0"
 			req, err := http.NewRequest(http.MethodDelete, url, nil)
 			if err != nil {
 				t.Errorf(err.Error())
@@ -477,6 +477,115 @@ func TestDeleteAccount_ServiceAPI(t *testing.T) {
 				return
 			}
 		})
+	}
+}
+
+func TestIntegratedAccount_ClientLibrary(t *testing.T) {
+
+	var buf bytes.Buffer
+	//CREATE
+	var tc = testCasesCreate_Client[0]
+	err := json.NewEncoder(&buf).Encode(tc.request)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+
+	r := httptest.NewRequest(http.MethodPut, "/accounts", &buf)
+	w := httptest.NewRecorder()
+	ServeHTTP(w, r)
+
+	if w.Code != tc.expected_status_code {
+		t.Errorf("Expected %d, returned %d", tc.expected_status_code, w.Code)
+		return
+	}
+
+	body, err := ioutil.ReadAll(w.Body)
+	var result domain.CreateAccountResult
+	errUnmarshal := json.Unmarshal(body, &result)
+	if errUnmarshal != nil {
+		t.Errorf(errUnmarshal.Error())
+		return
+	}
+
+	accountIds = append(accountIds, result.AccountId)
+
+	//FECTH
+	var tc2 = testCasesFetch[0]
+	r2 := httptest.NewRequest(http.MethodGet, "/accounts?account_id="+accountIds[len(accountIds)-1], nil)
+	w2 := httptest.NewRecorder()
+	ServeHTTP(w2, r2)
+
+	if w2.Code != tc2.expected_status_code {
+		t.Errorf("Expected %d, returned %d", tc2.expected_status_code, w2.Code)
+		return
+	}
+
+	//DELETE
+	var tc3 = testCasesDelete_Client[0]
+	r3 := httptest.NewRequest(http.MethodDelete, "/accounts?account_id="+accountIds[len(accountIds)-1], nil)
+	w3 := httptest.NewRecorder()
+	ServeHTTP(w3, r3)
+
+	if w3.Code != tc3.expected_status_code {
+		t.Errorf("Expected %d, returned %d", tc3.expected_status_code, w3.Code)
+		return
+	}
+
+}
+
+func TestIntegratedAccount_ServiceAPI(t *testing.T) {
+
+	//CREATE
+	var tc = testCasesCreate_ServiceAPI[0]
+
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(tc.request)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+
+	response, err := http.Post(URL, "application/json", &buf)
+
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+
+	if response.StatusCode != tc.expected_status_code {
+		t.Errorf("Expected %d, returned %d", tc.expected_status_code, response.StatusCode)
+		t.Errorf("Status Decription: %s", response.Status)
+		return
+	}
+
+	//FETCH
+	response2, err := http.Get(URL + "/" + tc.request.Data.ID)
+
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+
+	if response2.StatusCode != http.StatusOK {
+		t.Errorf("Expected %d, returned %d", http.StatusOK, response2.StatusCode)
+		t.Errorf("Status Decription: %s", response2.Status)
+		return
+	}
+
+	//DELETE
+	c := http.Client{Timeout: time.Duration(1) * time.Second}
+	url := URL + "/" + tc.request.Data.ID + "?version=0"
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	response3, err := c.Do(req)
+	if response3.StatusCode != http.StatusNoContent {
+		t.Errorf("Expected %d, returned %d", http.StatusNoContent, response3.StatusCode)
+		t.Errorf("Status Decription: %s", response3.Status)
+		return
 	}
 }
 
