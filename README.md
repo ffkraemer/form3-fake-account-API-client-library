@@ -1,6 +1,12 @@
 # form3-fake-account-API-client-library
 Creates a Client Library to call Fake Account API from Form3 assessment
 
+# About me
+I'm Fábio, brazilian and I'm .NET and C# specialist. Total of 12 years of experience in Software Development. Currently I work as Tech Lead on a project for a Portuguese bank. This is my first experience with GoLang, I hope you enjoy it!
+E-mail: ffkraemer@gmail.com
+https://www.linkedin.com/in/fabiofkm
+Phone: +351 915 660 463
+
 # Instructions:
 The client library can be invoked from Postman. Inside the collection found in ~\client-library\docs\Form3 API - Production.postman_collection.json, there's a folder called "Home Test - Fábio" where there are examples of invoking the developed client library.
 
