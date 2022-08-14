@@ -150,6 +150,28 @@ var testCasesFetch = []struct {
 
 //#endregion
 
+//#region DeleteTestCase
+
+var testCasesDelete_Client = []struct {
+	name                   string
+	account_id             string
+	expected_status_code   int
+	expected_message_error string
+}{
+	{"ShouldReturnOkOnDeleteSuccessfully", accountIds[0], http.StatusOK, ""},
+	{"AccountNotFound", "50078af6-1b5e-11ed-861d-0242ac120002", http.StatusNotFound, ""}}
+
+var testCasesDelete_ServiceAPI = []struct {
+	name                   string
+	account_id             string
+	expected_status_code   int
+	expected_message_error string
+}{
+	{"ShouldReturnNoContentOnDeleteSuccessfully", "", http.StatusNoContent, ""},
+	{"AccountNotFound", "50078af6-1b5e-11ed-861d-0242ac120002", http.StatusNotFound, ""}}
+
+//#endregion
+
 func TestCreateAccount_ClientLibrary(t *testing.T) {
 
 	for _, tc := range testCasesCreate_Client {
@@ -203,7 +225,9 @@ func TestCreateAccount_ClientLibrary(t *testing.T) {
 				t.Errorf(errUnmarshal.Error())
 				return
 			}
+
 			accountIds = append(accountIds, result.AccountId)
+
 		})
 	}
 }
@@ -369,6 +393,93 @@ func TestFetchAccount_ServiceAPI(t *testing.T) {
 	}
 }
 
+func TestDeleteAccount_ClientLibrary(t *testing.T) {
+
+	for _, tc := range testCasesDelete_Client {
+		t.Run("Client_"+tc.name, func(t *testing.T) {
+
+			r := httptest.NewRequest(http.MethodDelete, "/accounts?account_id="+tc.account_id, nil)
+			w := httptest.NewRecorder()
+			ServeHTTP(w, r)
+
+			if w.Code != tc.expected_status_code {
+				t.Errorf("Expected %d, returned %d", tc.expected_status_code, w.Code)
+				return
+			}
+
+			//This test is expecting some error
+			if len(tc.expected_message_error) > 0 {
+
+				body, err := ioutil.ReadAll(w.Body)
+				if err != nil {
+					t.Errorf(err.Error())
+					return
+				}
+
+				var exc domain.CustomException
+				errUnmarshal := json.Unmarshal(body, &exc)
+				if errUnmarshal != nil {
+					t.Errorf(errUnmarshal.Error())
+					return
+				}
+
+				if !strings.Contains(exc.ErrorMessage, tc.expected_message_error) {
+					t.Errorf("Expected %s, returned %s", tc.expected_message_error, exc.ErrorMessage)
+					return
+				}
+
+				return
+			}
+		})
+	}
+}
+
+func TestDeleteAccount_ServiceAPI(t *testing.T) {
+
+	c := http.Client{Timeout: time.Duration(1) * time.Second}
+	for _, tc := range testCasesDelete_ServiceAPI {
+		t.Run("ServiceAPI_"+tc.name, func(t *testing.T) {
+
+			url := URL + "/" + accountIds[len(accountIds)-1] + "?version=0"
+			req, err := http.NewRequest(http.MethodDelete, url, nil)
+			if err != nil {
+				t.Errorf(err.Error())
+				return
+			}
+			response, err := c.Do(req)
+			if response.StatusCode != tc.expected_status_code {
+				t.Errorf("Expected %d, returned %d", tc.expected_status_code, response.StatusCode)
+				t.Errorf("Status Decription: %s", response.Status)
+				return
+			}
+
+			//This test is expecting some error
+			if len(tc.expected_message_error) > 0 {
+
+				body, err := ioutil.ReadAll(response.Body)
+				if err != nil {
+					t.Errorf(err.Error())
+					return
+				}
+
+				var exc domain.CustomException
+				errUnmarshal := json.Unmarshal(body, &exc)
+				if errUnmarshal != nil {
+					t.Errorf(errUnmarshal.Error())
+					return
+				}
+
+				if !strings.Contains(exc.ErrorMessage, tc.expected_message_error) {
+					t.Errorf("Expected %s, returned %s", tc.expected_message_error, exc.ErrorMessage)
+					return
+				}
+
+				return
+			}
+		})
+	}
+}
+
 func Test_TearDown(t *testing.T) {
 	//CLEANING CREATED ACCOUNTS
 	for _, accountId := range accountIds {
@@ -380,7 +491,7 @@ func Test_TearDown(t *testing.T) {
 		if err != nil || response.StatusCode != http.StatusNoContent {
 			continue
 		}
-		fmt.Printf("Tear Down: accountId %v succesfully removed \n", accountId)
+		fmt.Printf("Tear Down: accountId %v successfully removed \n", accountId)
 	}
 }
 
